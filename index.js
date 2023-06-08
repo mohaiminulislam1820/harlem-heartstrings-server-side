@@ -73,3 +73,16 @@ app.get('/token', async(req, res) => {
 
     res.send({ token });
 })
+
+app.post('/user', async(req, res) => {
+    const user=req.body;
+
+    const collection = await client.db('harlem-heartstrings').collection('all-users');
+
+    const userResult=await collection.findOne({email:user.email});
+
+    if(!userResult){
+        await collection.insertOne(user);
+    }
+    res.send({"message":"recieved"})
+})
