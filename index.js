@@ -20,9 +20,17 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.USER_NAME}:${process.env.PASSWORD}@crud-practice.heeny6h.mongodb.net/?retryWrites=true&w=majority`;
 
 const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  }
+    serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+    }
 });
+
+app.get('/instructors', async (req, res) => {
+    const collection = await client.db('harlem-heartstrings').collection('all-users');
+
+    const result = await collection.find({ role: "instructor" }).toArray();
+
+    res.send(result);
+})
