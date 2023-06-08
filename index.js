@@ -34,3 +34,11 @@ app.get('/instructors', async (req, res) => {
 
     res.send(result);
 })
+
+app.get('/classes', async (req, res) => {
+    const collection = await client.db('harlem-heartstrings').collection('classes');
+
+    const result = await collection.find({}).toArray();
+
+    res.send(result);
+})
