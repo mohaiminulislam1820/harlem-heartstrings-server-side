@@ -1,6 +1,7 @@
 const express = require('express');
 const app = express();
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 app.use(cors());
@@ -41,4 +42,34 @@ app.get('/classes', async (req, res) => {
     const result = await collection.find({}).toArray();
 
     res.send(result);
+})
+
+const verifyJwt = (req, res, next) => {
+    const authorization = req.headers.authorization;
+
+    if (!authorization) {
+        return res.status(401).send({ message: 'not authorized' })
+    }
+
+    const payload = authorization.split(' ')[1];
+
+    const token = payload;
+
+    try {
+        const decoded = jwt.verify(token, process.env.SECRET);
+
+        next();
+    }
+    catch (err) {
+        return res.status(403).send({ message: 'not authorized' });
+    }
+
+}
+
+app.get('/token', async(req, res) => {
+    const payload = req.query.email;
+     
+    const token = jwt.sign({ payload }, process.env.SECRET, { expiresIn: "10h" });
+
+    res.send({ token });
 })
