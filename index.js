@@ -47,6 +47,8 @@ app.get('/classes', async (req, res) => {
 const verifyJwt = (req, res, next) => {
     const authorization = req.headers.authorization;
 
+    const queryEmail = req.query.email;
+
     if (!authorization) {
         return res.status(401).send({ message: 'not authorized' })
     }
@@ -57,7 +59,7 @@ const verifyJwt = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, process.env.SECRET);
-
+        req.decoded = decoded.payload;
         next();
     }
     catch (err) {
@@ -66,23 +68,35 @@ const verifyJwt = (req, res, next) => {
 
 }
 
-app.get('/token', async(req, res) => {
+app.get('/token', async (req, res) => {
     const payload = req.query.email;
-     
+
     const token = jwt.sign({ payload }, process.env.SECRET, { expiresIn: "10h" });
 
     res.send({ token });
 })
 
-app.post('/user', async(req, res) => {
-    const user=req.body;
+app.post('/user', async (req, res) => {
+    const user = req.body;
 
     const collection = await client.db('harlem-heartstrings').collection('all-users');
 
-    const userResult=await collection.findOne({email:user.email});
+    const userResult = await collection.findOne({ email: user.email });
 
-    if(!userResult){
+    if (!userResult) {
         await collection.insertOne(user);
     }
-    res.send({"message":"recieved"})
+    res.send({ "message": "recieved" })
 })
+
+app.get('/role', verifyJwt, async (req, res) => {
+    if (req.decoded !== req.query.email) {
+        return res.status(403).send({ message: 'not authorized' });
+    }
+    const collection = await client.db('harlem-heartstrings').collection('all-users');
+
+    const result = await collection.findOne({ email: req.query.email }, { projection: { _id: 0, role: 1 } })
+
+    res.send(result);
+})
+
