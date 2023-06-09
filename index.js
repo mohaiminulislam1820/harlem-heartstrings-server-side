@@ -127,3 +127,19 @@ app.get('/allusers',verifyJwt, async (req, res) => {
 
     res.send(result);
 })
+
+app.get('/instructor-classes',verifyJwt, async (req, res) => {
+    const collection1 = await client.db('harlem-heartstrings').collection('all-users');
+
+    const userRole = await collection1.findOne({ email: req.decoded }, { projection: { _id: 0, role: 1 } });
+
+    if(userRole.role!=="instructor")
+        return res.status(403).send({ message: 'not authorized' });
+
+    const collection = await client.db('harlem-heartstrings').collection('classes');
+
+    const result = await collection.find({instructor_email:req.decoded}).toArray();
+
+    res.send(result);
+})
+
