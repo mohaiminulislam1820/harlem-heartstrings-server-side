@@ -101,11 +101,27 @@ app.get('/role', verifyJwt, async (req, res) => {
 })
 
 app.get('/allclasses',verifyJwt, async (req, res) => {
-    const userRole = await collection.findOne({ email: req.decoded }, { projection: { _id: 0, role: 1 } });
-    if(userRole!=="admin")
+    const collection1 = await client.db('harlem-heartstrings').collection('all-users');
+
+    const userRole = await collection1.findOne({ email: req.decoded }, { projection: { _id: 0, role: 1 } });
+
+    if(userRole.role!=="admin")
         return res.status(403).send({ message: 'not authorized' });
 
     const collection = await client.db('harlem-heartstrings').collection('classes');
+
+    const result = await collection.find({}).toArray();
+
+    res.send(result);
+})
+
+app.get('/allusers',verifyJwt, async (req, res) => {
+    const collection = await client.db('harlem-heartstrings').collection('all-users');
+
+    const userRole = await collection.findOne({ email: req.decoded }, { projection: { _id: 0, role: 1 } });
+
+    if(userRole.role!=="admin")
+        return res.status(403).send({ message: 'not authorized' });
 
     const result = await collection.find({}).toArray();
 
