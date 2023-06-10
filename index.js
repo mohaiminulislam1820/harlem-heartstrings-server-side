@@ -217,18 +217,45 @@ app.patch('/update-selected-class', verifyJwt, async (req, res) => {
     if (user.role !== "student")
         return res.status(403).send({ message: 'not authorized' });
 
-    if (user?.selected_class){
-        if(user.selected_class.includes(req.body.selected_class))
-            return res.send({modifiedCount:"exists"});
+    if (user?.selected_class) {
+        if (user.selected_class.includes(req.body.selected_class))
+            return res.send({ modifiedCount: "exists" });
 
-        tasks = [...user.selected_class, req.body.selected_class];
+        tasks = [...user.selected_class, new ObjectId(req.body.selected_class)];
     }
     else
-        tasks = [req.body.selected_class]
+        tasks = [new ObjectId(req.body.selected_class)]
 
-    updateDoc = { $set: {selected_class:tasks} };
+
+    const collection = await client.db('harlem-heartstrings').collection('classes');
+    const classQuery = { _id: new ObjectId(req.body.selected_class) };
+    const selectedClass = await collection.findOne(classQuery); console.log(selectedClass)
+    if (selectedClass?.enrolledStudents)
+        enrolledStudents = [...enrolledStudents, new ObjectId(user._id)]
+    else enrolledStudents = [new ObjectId(user._id)]; console.log(enrolledStudents)
+    collection.updateOne(classQuery, { $set: { enrolledStudents: enrolledStudents } });
+
+    updateDoc = { $set: { selected_class: tasks } };
 
     const result = await collection1.updateOne({ email: req.decoded }, updateDoc);
+
+    res.send(result);
+})
+
+app.get('/my-classes', verifyJwt, async (req, res) => {
+    const collection1 = await client.db('harlem-heartstrings').collection('all-users');
+
+    const user = await collection1.findOne({ email: req.decoded }, { projection: { _id: 0, role: 1, selected_class: 1 } });
+
+    if (user.role !== "student")
+        return res.status(403).send({ message: 'not authorized' });
+
+    if (!user?.selected_class || user.selected_class.length == 0)
+        return res.send(JSON.stringify([]));
+  
+    const collection = await client.db('harlem-heartstrings').collection('classes');
+
+    const result = await collection.find({ _id: { $in: user.selected_class } }).toArray();
 
     res.send(result);
 })
