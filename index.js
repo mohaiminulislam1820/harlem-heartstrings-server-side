@@ -264,3 +264,12 @@ app.patch('/remove-class/:id', verifyJwt, async (req, res) => {
 
     res.send(result);
 })
+
+app.get('/popular-classes', async (req, res) => {
+    const collection = await client.db('harlem-heartstrings').collection('classes');
+
+    const result = await collection.find({ status: "approved" }, { projection: { _id: 1, image: 1, enrolled: 1 } }).limit(6).sort({ enrolled: -1 }).toArray();
+console.log(result);
+    res.send(result);
+});
+
