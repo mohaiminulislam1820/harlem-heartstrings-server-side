@@ -39,7 +39,7 @@ app.get('/instructors', async (req, res) => {
 app.get('/classes', async (req, res) => {
     const collection = await client.db('harlem-heartstrings').collection('classes');
 
-    const result = await collection.find({status:"approved"}).toArray();
+    const result = await collection.find({ status: "approved" }).toArray();
 
     res.send(result);
 })
@@ -100,12 +100,12 @@ app.get('/role', verifyJwt, async (req, res) => {
     res.send(result);
 })
 
-app.get('/allclasses',verifyJwt, async (req, res) => {
+app.get('/allclasses', verifyJwt, async (req, res) => {
     const collection1 = await client.db('harlem-heartstrings').collection('all-users');
 
     const userRole = await collection1.findOne({ email: req.decoded }, { projection: { _id: 0, role: 1 } });
 
-    if(userRole.role!=="admin")
+    if (userRole.role !== "admin")
         return res.status(403).send({ message: 'not authorized' });
 
     const collection = await client.db('harlem-heartstrings').collection('classes');
@@ -115,12 +115,12 @@ app.get('/allclasses',verifyJwt, async (req, res) => {
     res.send(result);
 })
 
-app.get('/allusers',verifyJwt, async (req, res) => {
+app.get('/allusers', verifyJwt, async (req, res) => {
     const collection = await client.db('harlem-heartstrings').collection('all-users');
 
     const userRole = await collection.findOne({ email: req.decoded }, { projection: { _id: 0, role: 1 } });
 
-    if(userRole.role!=="admin")
+    if (userRole.role !== "admin")
         return res.status(403).send({ message: 'not authorized' });
 
     const result = await collection.find({}).toArray();
@@ -128,43 +128,43 @@ app.get('/allusers',verifyJwt, async (req, res) => {
     res.send(result);
 })
 
-app.get('/instructor-classes',verifyJwt, async (req, res) => {
+app.get('/instructor-classes', verifyJwt, async (req, res) => {
     const collection1 = await client.db('harlem-heartstrings').collection('all-users');
 
     const userRole = await collection1.findOne({ email: req.decoded }, { projection: { _id: 0, role: 1 } });
 
-    if(userRole.role!=="instructor")
+    if (userRole.role !== "instructor")
         return res.status(403).send({ message: 'not authorized' });
 
     const collection = await client.db('harlem-heartstrings').collection('classes');
 
-    const result = await collection.find({instructor_email:req.decoded}).toArray();
+    const result = await collection.find({ instructor_email: req.decoded }).toArray();
 
     res.send(result);
 })
 
-app.post('/add-class',verifyJwt, async (req, res) => {
+app.post('/add-class', verifyJwt, async (req, res) => {
     const collection1 = await client.db('harlem-heartstrings').collection('all-users');
 
     const userRole = await collection1.findOne({ email: req.decoded }, { projection: { _id: 0, role: 1 } });
 
-    if(userRole.role!=="instructor")
+    if (userRole.role !== "instructor")
         return res.status(403).send({ message: 'not authorized' });
 
     const collection = await client.db('harlem-heartstrings').collection('classes');
-    const newClass=req.body;
+    const newClass = req.body;
 
     const result = await collection.insertOne(newClass);
 
     res.send(result);
 })
 
-app.patch('/update-task-status/:id',verifyJwt, async (req, res) => {
+app.patch('/update-task-status/:id', verifyJwt, async (req, res) => {
     const collection1 = await client.db('harlem-heartstrings').collection('all-users');
 
     const userRole = await collection1.findOne({ email: req.decoded }, { projection: { _id: 0, role: 1 } });
 
-    if(userRole.role!=="admin")
+    if (userRole.role !== "admin")
         return res.status(403).send({ message: 'not authorized' });
 
     const collection = await client.db('harlem-heartstrings').collection('classes');
@@ -176,12 +176,12 @@ app.patch('/update-task-status/:id',verifyJwt, async (req, res) => {
     res.send(result);
 })
 
-app.patch('/update-feedback/:id',verifyJwt, async (req, res) => {
+app.patch('/update-feedback/:id', verifyJwt, async (req, res) => {
     const collection1 = await client.db('harlem-heartstrings').collection('all-users');
 
     const userRole = await collection1.findOne({ email: req.decoded }, { projection: { _id: 0, role: 1 } });
 
-    if(userRole.role!=="admin")
+    if (userRole.role !== "admin")
         return res.status(403).send({ message: 'not authorized' });
 
     const collection = await client.db('harlem-heartstrings').collection('classes');
@@ -193,18 +193,42 @@ app.patch('/update-feedback/:id',verifyJwt, async (req, res) => {
     res.send(result);
 })
 
-app.patch('/update-user-role/:id',verifyJwt, async (req, res) => {
+app.patch('/update-user-role/:id', verifyJwt, async (req, res) => {
     const collection1 = await client.db('harlem-heartstrings').collection('all-users');
 
     const userRole = await collection1.findOne({ email: req.decoded }, { projection: { _id: 0, role: 1 } });
 
-    if(userRole.role!=="admin")
+    if (userRole.role !== "admin")
         return res.status(403).send({ message: 'not authorized' });
 
     const query = { _id: new ObjectId(req.params.id) };
     const updateDoc = { $set: req.body };
 
     const result = await collection1.updateOne(query, updateDoc);
+
+    res.send(result);
+})
+
+app.patch('/update-selected-class', verifyJwt, async (req, res) => {
+    const collection1 = await client.db('harlem-heartstrings').collection('all-users');
+
+    const user = await collection1.findOne({ email: req.decoded });
+
+    if (user.role !== "student")
+        return res.status(403).send({ message: 'not authorized' });
+
+    if (user?.selected_class){
+        if(user.selected_class.includes(req.body.selected_class))
+            return res.send({modifiedCount:"exists"});
+
+        tasks = [...user.selected_class, req.body.selected_class];
+    }
+    else
+        tasks = [req.body.selected_class]
+
+    updateDoc = { $set: {selected_class:tasks} };
+
+    const result = await collection1.updateOne({ email: req.decoded }, updateDoc);
 
     res.send(result);
 })
