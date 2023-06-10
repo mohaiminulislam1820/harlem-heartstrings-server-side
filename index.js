@@ -217,25 +217,15 @@ app.patch('/update-selected-class', verifyJwt, async (req, res) => {
     if (user.role !== "student")
         return res.status(403).send({ message: 'not authorized' });
 
-    if (user?.selected_class) {
-        if (user.selected_class.includes(req.body.selected_class))
-            return res.send({ modifiedCount: "exists" });
+    const selected_classId = new ObjectId(req.body.selected_class);
 
-        tasks = [...user.selected_class, new ObjectId(req.body.selected_class)];
-    }
-    else
-        tasks = [new ObjectId(req.body.selected_class)]
+    const classExists = await collection1.findOne({ email: req.decoded, selected_class: { $in: [selected_classId] } });
+    if (classExists) return res.send({ "modifiedCount": "exists" });
+    let updateDoc;
+    if (user?.selected_class)
+        updateDoc = { $push: { selected_class: selected_classId } };
+    else updateDoc = { $set: { selected_class: [selected_classId] } };
 
-
-    const collection = await client.db('harlem-heartstrings').collection('classes');
-    const classQuery = { _id: new ObjectId(req.body.selected_class) };
-    const selectedClass = await collection.findOne(classQuery); console.log(selectedClass)
-    if (selectedClass?.enrolledStudents)
-        enrolledStudents = [...enrolledStudents, new ObjectId(user._id)]
-    else enrolledStudents = [new ObjectId(user._id)]; console.log(enrolledStudents)
-    collection.updateOne(classQuery, { $set: { enrolledStudents: enrolledStudents } });
-
-    updateDoc = { $set: { selected_class: tasks } };
 
     const result = await collection1.updateOne({ email: req.decoded }, updateDoc);
 
@@ -252,10 +242,25 @@ app.get('/my-classes', verifyJwt, async (req, res) => {
 
     if (!user?.selected_class || user.selected_class.length == 0)
         return res.send(JSON.stringify([]));
-  
+
     const collection = await client.db('harlem-heartstrings').collection('classes');
 
     const result = await collection.find({ _id: { $in: user.selected_class } }).toArray();
+
+    res.send(result);
+})
+
+app.patch('/remove-class/:id', verifyJwt, async (req, res) => {
+    const collection1 = await client.db('harlem-heartstrings').collection('all-users');
+
+    const userRole = await collection1.findOne({ email: req.decoded }, { projection: { _id: 1, role: 1 } });
+
+    if (userRole.role !== "student")
+        return res.status(403).send({ message: 'not authorized' });
+
+    const userQuery = { _id: new ObjectId(userRole._id) };
+    const userUpdate = { $pull: { selected_class: new ObjectId(req.params.id) } };
+    const result = await collection1.updateOne(userQuery, userUpdate);
 
     res.send(result);
 })
