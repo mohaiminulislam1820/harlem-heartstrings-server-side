@@ -269,7 +269,48 @@ app.get('/popular-classes', async (req, res) => {
     const collection = await client.db('harlem-heartstrings').collection('classes');
 
     const result = await collection.find({ status: "approved" }, { projection: { _id: 1, image: 1, enrolled: 1 } }).limit(6).sort({ enrolled: -1 }).toArray();
-console.log(result);
+    console.log(result);
     res.send(result);
 });
 
+app.get('/popular-instructors', async (req, res) => {
+    const collection = await client.db('harlem-heartstrings').collection('all-users');
+
+    const pipeline = [
+        {
+            $match: { role: 'instructor' }
+        },
+        {
+            $lookup: {
+                from: 'classes',
+                localField: 'email',
+                foreignField: 'instructor_email',
+                as: 'enrolled_classes'
+            }
+        },
+        {
+            $addFields: {
+              enrolled_classes: {
+                $filter: {
+                  input: '$enrolled_classes',
+                  as: 'class',
+                  cond: { $eq: ['$$class.status', 'approved'] }
+                }
+              }
+            }
+          },
+        {
+            $project: {
+                _id: 1,
+                name: 1,
+                totalEnrolled: { $sum: '$enrolled_classes.enrolled' }
+            }
+        },
+        {
+            $sort: { totalEnrolled: -1 }
+        }
+    ];
+
+    const result = await collection.aggregate(pipeline).toArray();
+    res.send(result);
+});
