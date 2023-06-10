@@ -192,3 +192,19 @@ app.patch('/update-feedback/:id',verifyJwt, async (req, res) => {
 
     res.send(result);
 })
+
+app.patch('/update-user-role/:id',verifyJwt, async (req, res) => {
+    const collection1 = await client.db('harlem-heartstrings').collection('all-users');
+
+    const userRole = await collection1.findOne({ email: req.decoded }, { projection: { _id: 0, role: 1 } });
+
+    if(userRole.role!=="admin")
+        return res.status(403).send({ message: 'not authorized' });
+
+    const query = { _id: new ObjectId(req.params.id) };
+    const updateDoc = { $set: req.body };
+
+    const result = await collection1.updateOne(query, updateDoc);
+
+    res.send(result);
+})
