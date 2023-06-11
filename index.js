@@ -3,6 +3,7 @@ const app = express();
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 app.use(cors());
 app.use(express.json());
@@ -290,19 +291,20 @@ app.get('/popular-instructors', async (req, res) => {
         },
         {
             $addFields: {
-              enrolled_classes: {
-                $filter: {
-                  input: '$enrolled_classes',
-                  as: 'class',
-                  cond: { $eq: ['$$class.status', 'approved'] }
+                enrolled_classes: {
+                    $filter: {
+                        input: '$enrolled_classes',
+                        as: 'class',
+                        cond: { $eq: ['$$class.status', 'approved'] }
+                    }
                 }
-              }
             }
-          },
+        },
         {
             $project: {
                 _id: 1,
                 name: 1,
+                image: 1,
                 totalEnrolled: { $sum: '$enrolled_classes.enrolled' }
             }
         },
@@ -314,3 +316,56 @@ app.get('/popular-instructors', async (req, res) => {
     const result = await collection.aggregate(pipeline).toArray();
     res.send(result);
 });
+
+app.post("/create-payment-intent", verifyJwt, async (req, res) => {
+    const collection1 = await client.db('harlem-heartstrings').collection('all-users');
+
+    const userRole = await collection1.findOne({ email: req.decoded }, { projection: { role: 1 } });
+    console.log(userRole)
+    if (userRole.role !== "student")
+        return res.status(403).send({ message: 'not authorized' });
+
+    const { classId } = req.body;
+    const collection = await client.db('harlem-heartstrings').collection('classes');
+    const result = await collection.findOne({ _id: new ObjectId(classId) }, { projection: { price: 1 } });
+
+    const price = result.price * 100;
+
+    const paymentIntent = await stripe.paymentIntents.create({
+        amount: price,
+        currency: "usd",
+        payment_method_types: ['card']
+    });
+
+    res.send({
+        clientSecret: paymentIntent.client_secret,
+    });
+});
+
+app.patch('/save-payment', verifyJwt, async (req, res) => {
+    const collection1 = await client.db('harlem-heartstrings').collection('all-users');
+
+    const user = await collection1.findOne({ email: req.decoded });
+
+    if (user.role !== "student")
+        return res.status(403).send({ message: 'not authorized' });
+    const classId = new ObjectId(req.body.classId);
+    const userQuery = { _id: new ObjectId(user._id) };
+
+    const userUpdate = { $pull: { selected_class: classId } };
+    if (user.enrolled_classes) {
+        userUpdate.$push = { enrolled_classes: classId };
+    } else userUpdate.$set = { enrolled_classes: [classId] };
+
+    if (user.paymentId)
+        userUpdate.$push = { paymentId: classId };
+    else userUpdate.$set = { paymentId: [classId] };
+    console.log(userUpdate, classId)
+    await collection1.updateOne(userQuery, userUpdate);
+
+    const collection = await client.db('harlem-heartstrings').collection('classes');
+    const classUpdate = { $inc: { enrolled: 1, available_seats: -1 } };
+    const result = await collection.updateOne({ _id: classId }, classUpdate);
+
+    res.send(result);
+})
