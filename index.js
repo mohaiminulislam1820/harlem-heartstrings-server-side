@@ -270,7 +270,7 @@ app.get('/popular-classes', async (req, res) => {
     const collection = await client.db('harlem-heartstrings').collection('classes');
 
     const result = await collection.find({ status: "approved" }, { projection: { _id: 1, image: 1, enrolled: 1 } }).limit(6).sort({ enrolled: -1 }).toArray();
-    console.log(result);
+
     res.send(result);
 });
 
@@ -327,7 +327,7 @@ app.post("/create-payment-intent", verifyJwt, async (req, res) => {
 
     const { classId } = req.body;
     const collection = await client.db('harlem-heartstrings').collection('classes');
-    const result = await collection.findOne({ _id: new ObjectId(classId) }, { projection: { price: 1,name:1,instructorName:1 } });
+    const result = await collection.findOne({ _id: new ObjectId(classId) }, { projection: { price: 1, name: 1, instructorName: 1 } });
 
     const price = result.price * 100;
 
@@ -335,9 +335,9 @@ app.post("/create-payment-intent", verifyJwt, async (req, res) => {
         amount: price,
         currency: "usd",
         payment_method_types: ['card'],
-        metadata:{
-            instructorName:result.instructorName,
-            name:result.name
+        metadata: {
+            instructorName: result.instructorName,
+            name: result.name
         }
     });
 
@@ -393,7 +393,7 @@ app.get('/payment-history', verifyJwt, verifyStudent, async (req, res) => {
     const collection1 = await client.db('harlem-heartstrings').collection('all-users');
 
     const userPayment = await collection1.findOne({ email: req.decoded }, { projection: { paymentId: 1 } });
-    if(!userPayment.paymentId)
+    if (!userPayment.paymentId)
         return res.json([])
     const paymentIds = userPayment.paymentId;
 
@@ -408,6 +408,18 @@ app.get('/class/:id', async (req, res) => {
     const collection = await client.db('harlem-heartstrings').collection('classes');
 
     const result = await collection.findOne({ _id: new ObjectId(req.params.id) }, { projection: { name: 1, price: 1, instructorName: 1 } });
+
+    res.send(result);
+})
+
+app.get('/enrolled-classes', verifyJwt, verifyStudent, async (req, res) => {
+    const collection = await client.db('harlem-heartstrings').collection('all-users');
+    const user = await collection.findOne({ email: req.decoded }, { projection: { enrolled_classes: 1 } });
+
+    if (!user.enrolled_classes)
+        return res.json([]);
+    const collection1 = await client.db('harlem-heartstrings').collection('classes');
+    const result = await collection1.find({ _id: { $in: user.enrolled_classes } }).toArray();
 
     res.send(result);
 })
