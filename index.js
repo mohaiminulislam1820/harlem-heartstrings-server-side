@@ -60,6 +60,8 @@ const verifyJwt = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, process.env.SECRET);
+        if(req.decoded!==req.params.email)
+            return res.status(403).send({ message: 'not authorized' });
         req.decoded = decoded.payload;
         next();
     }
@@ -91,9 +93,6 @@ app.post('/user', async (req, res) => {
 })
 
 app.get('/role', verifyJwt, async (req, res) => {
-    if (req.decoded !== req.query.email) {
-        return res.status(403).send({ message: 'not authorized' });
-    }
     const collection = await client.db('harlem-heartstrings').collection('all-users');
 
     const result = await collection.findOne({ email: req.query.email }, { projection: { _id: 0, role: 1 } })
