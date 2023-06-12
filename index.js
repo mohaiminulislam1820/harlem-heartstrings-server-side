@@ -47,9 +47,6 @@ app.get('/classes', async (req, res) => {
 
 const verifyJwt = (req, res, next) => {
     const authorization = req.headers.authorization;
-
-    const queryEmail = req.query.email;
-
     if (!authorization) {
         return res.status(401).send({ message: 'not authorized' })
     }
@@ -312,7 +309,7 @@ app.get('/popular-instructors', async (req, res) => {
         }
     ];
 
-    const result = await collection.aggregate(pipeline).toArray();
+    const result = await collection.aggregate(pipeline).limit(6).toArray();
     res.send(result);
 });
 
