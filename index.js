@@ -321,20 +321,24 @@ app.post("/create-payment-intent", verifyJwt, async (req, res) => {
     const collection1 = await client.db('harlem-heartstrings').collection('all-users');
 
     const userRole = await collection1.findOne({ email: req.decoded }, { projection: { role: 1 } });
-    console.log(userRole)
+
     if (userRole.role !== "student")
         return res.status(403).send({ message: 'not authorized' });
 
     const { classId } = req.body;
     const collection = await client.db('harlem-heartstrings').collection('classes');
-    const result = await collection.findOne({ _id: new ObjectId(classId) }, { projection: { price: 1 } });
+    const result = await collection.findOne({ _id: new ObjectId(classId) }, { projection: { price: 1,name:1,instructorName:1 } });
 
     const price = result.price * 100;
 
     const paymentIntent = await stripe.paymentIntents.create({
         amount: price,
         currency: "usd",
-        payment_method_types: ['card']
+        payment_method_types: ['card'],
+        metadata:{
+            instructorName:result.instructorName,
+            name:result.name
+        }
     });
 
     res.send({
@@ -357,15 +361,53 @@ app.patch('/save-payment', verifyJwt, async (req, res) => {
         userUpdate.$push = { enrolled_classes: classId };
     } else userUpdate.$set = { enrolled_classes: [classId] };
 
-    if (user.paymentId)
-        userUpdate.$push = { paymentId: classId };
-    else userUpdate.$set = { paymentId: [classId] };
-    console.log(userUpdate, classId)
+    if (user.paymentId) {
+        if (userUpdate.$push)
+            userUpdate.$push.paymentId = req.body.paymentId
+        else userUpdate.$push = { paymentId: req.body.paymentId };
+    }
+    else if (userUpdate.$set)
+        userUpdate.$set.paymentId = [req.body.paymentId];
+    else userUpdate.$set = { paymentId: [req.body.paymentId] };
+
     await collection1.updateOne(userQuery, userUpdate);
 
     const collection = await client.db('harlem-heartstrings').collection('classes');
     const classUpdate = { $inc: { enrolled: 1, available_seats: -1 } };
     const result = await collection.updateOne({ _id: classId }, classUpdate);
+
+    res.send(result);
+})
+
+const verifyStudent = async (req, res, next) => {
+    const collection1 = await client.db('harlem-heartstrings').collection('all-users');
+
+    const userRole = await collection1.findOne({ email: req.decoded }, { projection: { role: 1 } });
+
+    if (userRole.role !== "student")
+        return res.status(403).send({ message: 'not authorized' });
+    next();
+}
+
+app.get('/payment-history', verifyJwt, verifyStudent, async (req, res) => {
+    const collection1 = await client.db('harlem-heartstrings').collection('all-users');
+
+    const userPayment = await collection1.findOne({ email: req.decoded }, { projection: { paymentId: 1 } });
+    if(!userPayment.paymentId)
+        return res.json([])
+    const paymentIds = userPayment.paymentId;
+
+    const paymentDetailsPromises = paymentIds.map((paymentId) => stripe.paymentIntents.retrieve(paymentId));
+
+    const paymentDetails = await Promise.all(paymentDetailsPromises);
+
+    res.send(paymentDetails);
+})
+
+app.get('/class/:id', async (req, res) => {
+    const collection = await client.db('harlem-heartstrings').collection('classes');
+
+    const result = await collection.findOne({ _id: new ObjectId(req.params.id) }, { projection: { name: 1, price: 1, instructorName: 1 } });
 
     res.send(result);
 })
